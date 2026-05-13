@@ -1,248 +1,223 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-
-const USERNAME = 'Juan12'
-const PASSWORD = 'klingmotion'
+import { useState } from 'react'
 
 export default function Page() {
-  const [loggedIn, setLoggedIn] = useState(false)
-
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-
   const [apiKey, setApiKey] = useState('')
-
-  const [imageFile, setImageFile] = useState(null)
-  const [videoFile, setVideoFile] = useState(null)
-
+  const [image, setImage] = useState(null)
+  const [video, setVideo] = useState(null)
   const [imagePreview, setImagePreview] = useState('')
   const [videoPreview, setVideoPreview] = useState('')
-
   const [prompt, setPrompt] = useState('')
-
-  const [cfg, setCfg] = useState(0.5)
+  const [cfgScale, setCfgScale] = useState(0.5)
 
   const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState('')
 
-  const [history, setHistory] = useState([])
-
-  useEffect(() => {
-    const login = localStorage.getItem('login')
-    const historyData = localStorage.getItem('history')
-
-    if (login === 'true') {
-      setLoggedIn(true)
-    }
-
-    if (historyData) {
-      setHistory(JSON.parse(historyData))
-    }
-  }, [])
-
-  const login = () => {
-    if (
-      username === USERNAME &&
-      password === PASSWORD
-    ) {
-      localStorage.setItem('login', 'true')
-      setLoggedIn(true)
-    } else {
-      alert('Login salah')
-    }
-  }
-
-  const logout = () => {
-    localStorage.removeItem('login')
-    setLoggedIn(false)
-  }
-
-  const saveHistory = (item) => {
-    const updated = [item, ...history]
-    setHistory(updated)
-    localStorage.setItem(
-      'history',
-      JSON.stringify(updated)
-    )
-  }
-
-  const uploadToTmp = async (file) => {
+  async function uploadFile(file) {
     const form = new FormData()
+
     form.append('file', file)
 
-    const res = await fetch(
-      'https://tmpfiles.org/api/v1/upload',
-      {
-        method: 'POST',
-        body: form
-      }
-    )
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: form
+    })
 
-    const data = await res.json()
-
-    return data.data.url.replace(
-      'tmpfiles.org/',
-      'tmpfiles.org/dl/'
-    )
+    return await res.json()
   }
 
-  const generate = async () => {
+  async function generateVideo() {
     try {
       setLoading(true)
 
-      let imageUrl = ''
-      let videoUrl = ''
+      const uploadedImage =
+        await uploadFile(image)
 
-      if (imageFile) {
-        imageUrl = await uploadToTmp(imageFile)
-      }
+      const uploadedVideo =
+        await uploadFile(video)
 
-      if (videoFile) {
-        videoUrl = await uploadToTmp(videoFile)
-      }
+      const generate = await fetch(
+        '/api/generate',
+        {
+          method: 'POST',
 
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          apiKey,
-          imageUrl,
-          videoUrl,
-          prompt,
-          cfg
-        })
-      })
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
 
-      const data = await res.json()
+          body: JSON.stringify({
+            apiKey,
 
-      if (data.error) {
-        alert(JSON.stringify(data.error))
+            endpoint:
+              'https://api.magnific.com/v1/ai-video/kling/generate',
+
+            imageUrl:
+              uploadedImage.url,
+
+            videoUrl:
+              uploadedVideo.url,
+
+            prompt,
+
+            cfgScale
+          })
+        }
+      )
+
+      const generated =
+        await generate.json()
+
+      const taskId =
+        generated?.data?.task_id
+
+      if (!taskId) {
+        alert(
+          JSON.stringify(generated)
+        )
+
+        setLoading(false)
+
         return
       }
 
-      saveHistory(data.video)
+      const interval = setInterval(
+        async () => {
+          const status =
+            await fetch(
+              '/api/status',
+              {
+                method: 'POST',
 
-      alert('Video berhasil dibuat 🔥')
+                headers: {
+                  'Content-Type':
+                    'application/json'
+                },
+
+                body: JSON.stringify({
+                  apiKey,
+
+                  endpoint:
+                    'https://api.magnific.com/v1/ai-video/kling/status',
+
+                  taskId
+                })
+              }
+            )
+
+          const data =
+            await status.json()
+
+          if (
+            data?.data?.status ===
+            'COMPLETED'
+          ) {
+            clearInterval(interval)
+
+            setResult(
+              data.data.generated[0]
+            )
+
+            setLoading(false)
+          }
+        },
+
+        5000
+      )
     } catch (err) {
       alert(err.message)
-    } finally {
+
       setLoading(false)
     }
   }
 
-  if (!loggedIn) {
-    return (
-      <div style={styles.bg}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>
-            MOTION CONTROL
-            <br />
-            SAAYANA
-          </h1>
-
-          <input
-            placeholder="Username"
-            value={username}
-            onChange={(e) =>
-              setUsername(e.target.value)
-            }
-            style={styles.input}
-          />
-
-          <input
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
-            style={styles.input}
-          />
-
-          <button
-            onClick={login}
-            style={styles.button}
-          >
-            Login
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div style={styles.bg}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>
+    <main
+      style={{
+        background: '#020617',
+        minHeight: '100vh',
+        color: 'white',
+        padding: 20
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 500,
+          margin: '0 auto',
+          background: '#0f172a',
+          padding: 20,
+          borderRadius: 20
+        }}
+      >
+        <h1
+          style={{
+            fontSize: 40,
+            fontWeight: 'bold'
+          }}
+        >
           MOTION CONTROL
           <br />
-          SAAYANA
+          SAYAANA
         </h1>
 
-        <button
-          onClick={logout}
-          style={styles.logout}
-        >
-          Logout
-        </button>
-
         <input
-          placeholder="API KEY"
+          placeholder='API KEY'
           value={apiKey}
           onChange={(e) =>
             setApiKey(e.target.value)
           }
-          style={styles.input}
+          style={input}
         />
 
-        <div style={styles.row}>
-          <div style={styles.box}>
-            <h3>Reference Image</h3>
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            marginTop: 20
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <p>Reference Image</p>
 
             <input
-              type="file"
-              accept="image/*"
+              type='file'
+              accept='image/*'
               onChange={(e) => {
                 const file =
                   e.target.files[0]
 
-                setImageFile(file)
+                setImage(file)
 
-                if (file) {
-                  setImagePreview(
-                    URL.createObjectURL(file)
-                  )
-                }
+                setImagePreview(
+                  URL.createObjectURL(file)
+                )
               }}
             />
 
             {imagePreview && (
               <img
                 src={imagePreview}
-                style={styles.preview}
+                style={preview}
               />
             )}
           </div>
 
-          <div style={styles.box}>
-            <h3>Reference Motion</h3>
+          <div style={{ flex: 1 }}>
+            <p>Reference Motion</p>
 
             <input
-              type="file"
-              accept="video/*"
+              type='file'
+              accept='video/*'
               onChange={(e) => {
                 const file =
                   e.target.files[0]
 
-                setVideoFile(file)
+                setVideo(file)
 
-                if (file) {
-                  setVideoPreview(
-                    URL.createObjectURL(file)
-                  )
-                }
+                setVideoPreview(
+                  URL.createObjectURL(file)
+                )
               }}
             />
 
@@ -250,152 +225,92 @@ export default function Page() {
               <video
                 src={videoPreview}
                 controls
-                style={styles.preview}
+                style={preview}
               />
             )}
           </div>
         </div>
 
         <textarea
-          placeholder="Prompt Motion"
+          placeholder='Prompt Motion'
           value={prompt}
           onChange={(e) =>
             setPrompt(e.target.value)
           }
-          style={styles.textarea}
+          style={{
+            ...input,
+            height: 120,
+            marginTop: 20
+          }}
         />
 
-        <h2>CFG Scale: {cfg}</h2>
+        <h2>
+          CFG Scale: {cfgScale}
+        </h2>
 
         <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.1"
-          value={cfg}
+          type='range'
+          min='0'
+          max='1'
+          step='0.1'
+          value={cfgScale}
           onChange={(e) =>
-            setCfg(e.target.value)
+            setCfgScale(e.target.value)
           }
-          style={{ width: '100%' }}
+          style={{
+            width: '100%'
+          }}
         />
 
         <button
-          onClick={generate}
+          onClick={generateVideo}
           disabled={loading}
-          style={styles.button}
+          style={button}
         >
           {loading
-            ? 'Generating Video...'
+            ? 'Generating...'
             : 'Generate Video'}
         </button>
 
-        <h1 style={styles.history}>
-          History Generate
-        </h1>
-
-        {history.map((item, index) => (
+        {result && (
           <video
-            key={index}
-            src={item}
+            src={result}
             controls
-            style={styles.historyVideo}
+            style={{
+              width: '100%',
+              marginTop: 20,
+              borderRadius: 20
+            }}
           />
-        ))}
+        )}
       </div>
-    </div>
+    </main>
   )
 }
 
-const styles = {
-  bg: {
-    background: '#020617',
-    minHeight: '100vh',
-    padding: 20,
-    color: 'white'
-  },
+const input = {
+  width: '100%',
+  padding: 15,
+  borderRadius: 15,
+  border: '1px solid #334155',
+  background: '#1e293b',
+  color: 'white',
+  marginTop: 15
+}
 
-  card: {
-    maxWidth: 1100,
-    margin: '0 auto',
-    background: '#081028',
-    borderRadius: 30,
-    padding: 30
-  },
+const button = {
+  width: '100%',
+  padding: 15,
+  borderRadius: 15,
+  border: 'none',
+  background: '#2563eb',
+  color: 'white',
+  fontWeight: 'bold',
+  marginTop: 20
+}
 
-  title: {
-    fontSize: 60,
-    fontWeight: 'bold',
-    lineHeight: 1
-  },
-
-  input: {
-    width: '100%',
-    padding: 18,
-    marginTop: 20,
-    borderRadius: 15,
-    border: '1px solid #334155',
-    background: '#1e293b',
-    color: 'white',
-    fontSize: 18
-  },
-
-  textarea: {
-    width: '100%',
-    height: 180,
-    padding: 20,
-    borderRadius: 20,
-    border: '1px solid #334155',
-    background: '#1e293b',
-    color: 'white',
-    marginTop: 20,
-    fontSize: 18
-  },
-
-  button: {
-    width: '100%',
-    padding: 20,
-    background: '#2563eb',
-    border: 'none',
-    borderRadius: 20,
-    color: 'white',
-    fontSize: 20,
-    marginTop: 20
-  },
-
-  logout: {
-    background: '#dc2626',
-    border: 'none',
-    padding: '12px 20px',
-    color: 'white',
-    borderRadius: 15,
-    marginTop: 10
-  },
-
-  row: {
-    display: 'flex',
-    gap: 20,
-    marginTop: 30,
-    flexWrap: 'wrap'
-  },
-
-  box: {
-    flex: 1,
-    minWidth: 300
-  },
-
-  preview: {
-    width: '100%',
-    borderRadius: 20,
-    marginTop: 10
-  },
-
-  history: {
-    marginTop: 40
-  },
-
-  historyVideo: {
-    width: '100%',
-    borderRadius: 20,
-    marginTop: 20
-  }
-      }
+const preview = {
+  width: '100%',
+  borderRadius: 15,
+  marginTop: 10
+          }
