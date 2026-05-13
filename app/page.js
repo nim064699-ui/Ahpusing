@@ -1,103 +1,130 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const USERNAME = 'Juan12'
 const PASSWORD = 'klingmotion'
 
-const MODELS = {
-  'kling-2.6-std':
-    'https://api.magnific.com/v1/ai/video/kling-v2-6-motion-control-std',
-
-  'kling-2.6-pro':
-    'https://api.magnific.com/v1/ai/video/kling-v2-6-motion-control-pro',
-
-  'kling-3-std':
-    'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
-
-  'kling-3-pro':
-    'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-pro'
-}
-
 export default function Page() {
-  const [loggedIn, setLoggedIn] =
-    useState(false)
+  const [loggedIn, setLoggedIn] = useState(false)
 
-  const [username, setUsername] =
-    useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
 
-  const [password, setPassword] =
-    useState('')
+  const [apiKey, setApiKey] = useState('')
 
-  const [apiKey, setApiKey] =
-    useState('')
+  const [imageFile, setImageFile] = useState(null)
+  const [videoFile, setVideoFile] = useState(null)
 
-  const [model, setModel] = useState(
-    'kling-2.6-std'
-  )
+  const [imagePreview, setImagePreview] = useState('')
+  const [videoPreview, setVideoPreview] = useState('')
 
-  const [imageFile, setImageFile] =
-    useState(null)
+  const [prompt, setPrompt] = useState('')
 
-  const [videoFile, setVideoFile] =
-    useState(null)
+  const [cfg, setCfg] = useState(0.5)
 
-  const [imagePreview, setImagePreview] =
-    useState('')
+  const [loading, setLoading] = useState(false)
 
-  const [videoPreview, setVideoPreview] =
-    useState('')
-
-  const [prompt, setPrompt] =
-    useState('')
-
-  const [cfgScale, setCfgScale] =
-    useState(0.5)
-
-  const [loading, setLoading] =
-    useState(false)
+  const [history, setHistory] = useState([])
 
   useEffect(() => {
-    const login =
-      localStorage.getItem('login')
+    const login = localStorage.getItem('login')
+    const historyData = localStorage.getItem('history')
 
     if (login === 'true') {
       setLoggedIn(true)
     }
+
+    if (historyData) {
+      setHistory(JSON.parse(historyData))
+    }
   }, [])
 
-  const handleLogin = () => {
+  const login = () => {
     if (
       username === USERNAME &&
       password === PASSWORD
     ) {
       localStorage.setItem('login', 'true')
-
       setLoggedIn(true)
     } else {
-      alert('Login gagal')
+      alert('Login salah')
     }
   }
 
   const logout = () => {
     localStorage.removeItem('login')
-
     setLoggedIn(false)
   }
 
-  const generateVideo = async () => {
-    if (!imageFile || !videoFile) {
-      return alert(
-        'Upload image & video dulu'
-      )
-    }
+  const saveHistory = (item) => {
+    const updated = [item, ...history]
+    setHistory(updated)
+    localStorage.setItem(
+      'history',
+      JSON.stringify(updated)
+    )
+  }
 
+  const uploadToTmp = async (file) => {
+    const form = new FormData()
+    form.append('file', file)
+
+    const res = await fetch(
+      'https://tmpfiles.org/api/v1/upload',
+      {
+        method: 'POST',
+        body: form
+      }
+    )
+
+    const data = await res.json()
+
+    return data.data.url.replace(
+      'tmpfiles.org/',
+      'tmpfiles.org/dl/'
+    )
+  }
+
+  const generate = async () => {
     try {
       setLoading(true)
 
-      alert(
-        'Upload mode UI berhasil 😄🔥\n\nBackend upload belum dipasang.'
-      )
+      let imageUrl = ''
+      let videoUrl = ''
+
+      if (imageFile) {
+        imageUrl = await uploadToTmp(imageFile)
+      }
+
+      if (videoFile) {
+        videoUrl = await uploadToTmp(videoFile)
+      }
+
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          apiKey,
+          imageUrl,
+          videoUrl,
+          prompt,
+          cfg
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.error) {
+        alert(JSON.stringify(data.error))
+        return
+      }
+
+      saveHistory(data.video)
+
+      alert('Video berhasil dibuat 🔥')
     } catch (err) {
       alert(err.message)
     } finally {
@@ -107,34 +134,38 @@ export default function Page() {
 
   if (!loggedIn) {
     return (
-      <div style={loginWrap}>
-        <div style={loginBox}>
-          <h1>MOTION CONTROL SA AYANA</h1>
+      <div style={styles.bg}>
+        <div style={styles.card}>
+          <h1 style={styles.title}>
+            MOTION CONTROL
+            <br />
+            SAYAANA
+          </h1>
 
           <input
-            placeholder='Username'
+            placeholder="Username"
             value={username}
             onChange={(e) =>
               setUsername(e.target.value)
             }
-            style={inputStyle}
+            style={styles.input}
           />
 
           <input
-            type='password'
-            placeholder='Password'
+            placeholder="Password"
+            type="password"
             value={password}
             onChange={(e) =>
               setPassword(e.target.value)
             }
-            style={inputStyle}
+            style={styles.input}
           />
 
           <button
-            onClick={handleLogin}
-            style={buttonStyle}
+            onClick={login}
+            style={styles.button}
           >
-            LOGIN
+            Login
           </button>
         </div>
       </div>
@@ -142,246 +173,229 @@ export default function Page() {
   }
 
   return (
-    <div style={mainStyle}>
-      <div style={container}>
-        <div style={card}>
-          <h1 style={title}>
-            MOTION CONTROL
-            <br />
-            SAYAANA
-          </h1>
+    <div style={styles.bg}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>
+          MOTION CONTROL
+          <br />
+          SAYAANA
+        </h1>
 
-          <button
-            onClick={logout}
-            style={logoutStyle}
-          >
-            Logout
-          </button>
+        <button
+          onClick={logout}
+          style={styles.logout}
+        >
+          Logout
+        </button>
 
-          <input
-            placeholder='Magnific API Key'
-            value={apiKey}
-            onChange={(e) =>
-              setApiKey(e.target.value)
-            }
-            style={inputStyle}
-          />
+        <input
+          placeholder="API KEY"
+          value={apiKey}
+          onChange={(e) =>
+            setApiKey(e.target.value)
+          }
+          style={styles.input}
+        />
 
-          <select
-            value={model}
-            onChange={(e) =>
-              setModel(e.target.value)
-            }
-            style={inputStyle}
-          >
-            <option value='kling-2.6-std'>
-              Kling 2.6 Standard
-            </option>
+        <div style={styles.row}>
+          <div style={styles.box}>
+            <h3>Reference Image</h3>
 
-            <option value='kling-2.6-pro'>
-              Kling 2.6 Pro
-            </option>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file =
+                  e.target.files[0]
 
-            <option value='kling-3-std'>
-              Kling 3 Standard
-            </option>
+                setImageFile(file)
 
-            <option value='kling-3-pro'>
-              Kling 3 Pro
-            </option>
-          </select>
-
-          <div style={uploadGrid}>
-            <div>
-              <h3>Reference Image</h3>
-
-              <input
-                type='file'
-                accept='image/*'
-                onChange={(e) => {
-                  const file =
-                    e.target.files[0]
-
-                  setImageFile(file)
-
+                if (file) {
                   setImagePreview(
                     URL.createObjectURL(file)
                   )
-                }}
+                }
+              }}
+            />
+
+            {imagePreview && (
+              <img
+                src={imagePreview}
+                style={styles.preview}
               />
+            )}
+          </div>
 
-              {imagePreview && (
-                <img
-                  src={imagePreview}
-                  style={previewStyle}
-                />
-              )}
-            </div>
+          <div style={styles.box}>
+            <h3>Reference Motion</h3>
 
-            <div>
-              <h3>Reference Motion</h3>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={(e) => {
+                const file =
+                  e.target.files[0]
 
-              <input
-                type='file'
-                accept='video/*'
-                onChange={(e) => {
-                  const file =
-                    e.target.files[0]
+                setVideoFile(file)
 
-                  setVideoFile(file)
-
+                if (file) {
                   setVideoPreview(
                     URL.createObjectURL(file)
                   )
-                }}
+                }
+              }}
+            />
+
+            {videoPreview && (
+              <video
+                src={videoPreview}
+                controls
+                style={styles.preview}
               />
-
-              {videoPreview && (
-                <video
-                  src={videoPreview}
-                  controls
-                  style={previewStyle}
-                />
-              )}
-            </div>
+            )}
           </div>
-
-          <textarea
-            placeholder='Prompt Motion'
-            value={prompt}
-            onChange={(e) =>
-              setPrompt(e.target.value)
-            }
-            style={textareaStyle}
-          />
-
-          <h3>
-            CFG Scale: {cfgScale}
-          </h3>
-
-          <input
-            type='range'
-            min='0'
-            max='1'
-            step='0.1'
-            value={cfgScale}
-            onChange={(e) =>
-              setCfgScale(e.target.value)
-            }
-            style={{ width: '100%' }}
-          />
-
-          <button
-            onClick={generateVideo}
-            disabled={loading}
-            style={buttonStyle}
-          >
-            {loading
-              ? 'Generating...'
-              : 'Generate Video'}
-          </button>
         </div>
+
+        <textarea
+          placeholder="Prompt Motion"
+          value={prompt}
+          onChange={(e) =>
+            setPrompt(e.target.value)
+          }
+          style={styles.textarea}
+        />
+
+        <h2>CFG Scale: {cfg}</h2>
+
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={cfg}
+          onChange={(e) =>
+            setCfg(e.target.value)
+          }
+          style={{ width: '100%' }}
+        />
+
+        <button
+          onClick={generate}
+          disabled={loading}
+          style={styles.button}
+        >
+          {loading
+            ? 'Generating Video...'
+            : 'Generate Video'}
+        </button>
+
+        <h1 style={styles.history}>
+          History Generate
+        </h1>
+
+        {history.map((item, index) => (
+          <video
+            key={index}
+            src={item}
+            controls
+            style={styles.historyVideo}
+          />
+        ))}
       </div>
     </div>
   )
 }
 
-const uploadGrid = {
-  display: 'grid',
-  gridTemplateColumns:
-    'repeat(auto-fit,minmax(250px,1fr))',
-  gap: 20,
-  marginTop: 20
-}
+const styles = {
+  bg: {
+    background: '#020617',
+    minHeight: '100vh',
+    padding: 20,
+    color: 'white'
+  },
 
-const previewStyle = {
-  width: '100%',
-  borderRadius: 20,
-  marginTop: 10,
-  maxHeight: 300,
-  objectFit: 'cover'
-}
+  card: {
+    maxWidth: 1100,
+    margin: '0 auto',
+    background: '#081028',
+    borderRadius: 30,
+    padding: 30
+  },
 
-const loginWrap = {
-  minHeight: '100vh',
-  background: '#020617',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  padding: 20
-}
+  title: {
+    fontSize: 60,
+    fontWeight: 'bold',
+    lineHeight: 1
+  },
 
-const loginBox = {
-  width: '100%',
-  maxWidth: 400,
-  background: '#0f172a',
-  padding: 25,
-  borderRadius: 25,
-  color: 'white'
-}
+  input: {
+    width: '100%',
+    padding: 18,
+    marginTop: 20,
+    borderRadius: 15,
+    border: '1px solid #334155',
+    background: '#1e293b',
+    color: 'white',
+    fontSize: 18
+  },
 
-const mainStyle = {
-  minHeight: '100vh',
-  background: '#020617',
-  padding: 20,
-  color: 'white'
-}
+  textarea: {
+    width: '100%',
+    height: 180,
+    padding: 20,
+    borderRadius: 20,
+    border: '1px solid #334155',
+    background: '#1e293b',
+    color: 'white',
+    marginTop: 20,
+    fontSize: 18
+  },
 
-const container = {
-  maxWidth: 1000,
-  margin: '0 auto'
-}
+  button: {
+    width: '100%',
+    padding: 20,
+    background: '#2563eb',
+    border: 'none',
+    borderRadius: 20,
+    color: 'white',
+    fontSize: 20,
+    marginTop: 20
+  },
 
-const card = {
-  background: '#0f172a',
-  padding: 20,
-  borderRadius: 25,
-  marginBottom: 20
-}
+  logout: {
+    background: '#dc2626',
+    border: 'none',
+    padding: '12px 20px',
+    color: 'white',
+    borderRadius: 15,
+    marginTop: 10
+  },
 
-const title = {
-  fontSize: 55,
-  lineHeight: 1,
-  marginBottom: 20
-}
+  row: {
+    display: 'flex',
+    gap: 20,
+    marginTop: 30,
+    flexWrap: 'wrap'
+  },
 
-const inputStyle = {
-  width: '100%',
-  padding: 15,
-  marginTop: 15,
-  borderRadius: 15,
-  border: '1px solid #334155',
-  background: '#1e293b',
-  color: 'white'
-}
+  box: {
+    flex: 1,
+    minWidth: 300
+  },
 
-const textareaStyle = {
-  width: '100%',
-  height: 150,
-  marginTop: 20,
-  borderRadius: 15,
-  border: '1px solid #334155',
-  background: '#1e293b',
-  color: 'white',
-  padding: 15
-}
+  preview: {
+    width: '100%',
+    borderRadius: 20,
+    marginTop: 10
+  },
 
-const buttonStyle = {
-  width: '100%',
-  padding: 15,
-  marginTop: 20,
-  border: 'none',
-  borderRadius: 15,
-  background: '#2563eb',
-  color: 'white',
-  fontWeight: 'bold'
-}
+  history: {
+    marginTop: 40
+  },
 
-const logoutStyle = {
-  padding: '10px 20px',
-  borderRadius: 15,
-  border: 'none',
-  background: '#dc2626',
-  color: 'white',
-  marginBottom: 20
-                        }
+  historyVideo: {
+    width: '100%',
+    borderRadius: 20,
+    marginTop: 20
+  }
+      }
