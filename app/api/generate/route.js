@@ -12,14 +12,8 @@ export async function POST(req) {
       cfg
     } = body
 
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'API Key kosong'
-      })
-    }
-
-    const create = await fetch(
-      'https://api.magnific.ai/v1/ai/image-to-video/kling/generate',
+    const response = await fetch(
+      'https://api.magnific.ai/v1/ai/image-to-video',
       {
         method: 'POST',
         headers: {
@@ -30,50 +24,23 @@ export async function POST(req) {
           model: 'kling-2.6-standard',
           image_url: imageUrl,
           motion_video_url: videoUrl,
-          prompt,
-          cfg_scale: cfg
+          prompt: prompt,
+          cfg_scale: Number(cfg)
         })
       }
     )
 
-    const result = await create.json()
+    const text = await response.text()
 
-    if (!result.task_id) {
+    try {
+      const data = JSON.parse(text)
+
+      return NextResponse.json(data)
+    } catch {
       return NextResponse.json({
-        error: result
+        error: text
       })
     }
-
-    let finalVideo = null
-
-    for (let i = 0; i < 60; i++) {
-      await new Promise((r) => setTimeout(r, 5000))
-
-      const status = await fetch(
-        `https://api.magnific.ai/v1/ai/image-to-video/kling/status/${result.task_id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`
-          }
-        }
-      )
-
-      const data = await status.json()
-
-      if (data.status === 'succeeded') {
-        finalVideo =
-          data.video_url ||
-          data.output?.video_url ||
-          data.result?.video_url
-
-        break
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      video: finalVideo
-    })
   } catch (err) {
     return NextResponse.json({
       error: err.message
