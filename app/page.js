@@ -139,7 +139,7 @@ export default function Page() {
           <h1 style={styles.title}>
             MOTION CONTROL
             <br />
-            SAYAANA
+            SAAYANA
           </h1>
 
           <input
@@ -178,7 +178,7 @@ export default function Page() {
         <h1 style={styles.title}>
           MOTION CONTROL
           <br />
-          SAYAANA
+          SAAYANA
         </h1>
 
         <button
