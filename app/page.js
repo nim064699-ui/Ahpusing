@@ -36,10 +36,16 @@ export default function Page() {
     'kling-2.6-std'
   )
 
-  const [imageUrl, setImageUrl] =
+  const [imageFile, setImageFile] =
+    useState(null)
+
+  const [videoFile, setVideoFile] =
+    useState(null)
+
+  const [imagePreview, setImagePreview] =
     useState('')
 
-  const [videoUrl, setVideoUrl] =
+  const [videoPreview, setVideoPreview] =
     useState('')
 
   const [prompt, setPrompt] =
@@ -51,15 +57,6 @@ export default function Page() {
   const [loading, setLoading] =
     useState(false)
 
-  const [status, setStatus] =
-    useState('')
-
-  const [resultVideo, setResultVideo] =
-    useState('')
-
-  const [history, setHistory] =
-    useState([])
-
   useEffect(() => {
     const login =
       localStorage.getItem('login')
@@ -67,25 +64,7 @@ export default function Page() {
     if (login === 'true') {
       setLoggedIn(true)
     }
-
-    const savedHistory =
-      localStorage.getItem('history')
-
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory))
-    }
   }, [])
-
-  const saveHistory = (item) => {
-    const updated = [item, ...history]
-
-    setHistory(updated)
-
-    localStorage.setItem(
-      'history',
-      JSON.stringify(updated)
-    )
-  }
 
   const handleLogin = () => {
     if (
@@ -96,7 +75,7 @@ export default function Page() {
 
       setLoggedIn(true)
     } else {
-      alert('Username atau password salah')
+      alert('Login gagal')
     }
   }
 
@@ -107,55 +86,22 @@ export default function Page() {
   }
 
   const generateVideo = async () => {
+    if (!imageFile || !videoFile) {
+      return alert(
+        'Upload image & video dulu'
+      )
+    }
+
     try {
       setLoading(true)
 
-      setStatus('Generating video...')
-
-      const res = await fetch(
-        '/api/generate',
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-
-          body: JSON.stringify({
-            apiKey,
-
-            endpoint: MODELS[model],
-
-            imageUrl,
-
-            videoUrl,
-
-            prompt,
-
-            cfgScale
-          })
-        }
+      alert(
+        'Upload mode UI berhasil 😄🔥\n\nBackend upload belum dipasang.'
       )
-
-      const data = await res.json()
-
-      if (data.video_url) {
-        setResultVideo(data.video_url)
-
-        saveHistory({
-          video: data.video_url,
-          prompt
-        })
-      } else {
-        alert(JSON.stringify(data))
-      }
     } catch (err) {
       alert(err.message)
     } finally {
       setLoading(false)
-
-      setStatus('')
     }
   }
 
@@ -163,7 +109,7 @@ export default function Page() {
     return (
       <div style={loginWrap}>
         <div style={loginBox}>
-          <h1>MOTION CONTROL SAYAANA</h1>
+          <h1>MOTION CONTROL SA AYANA</h1>
 
           <input
             placeholder='Username'
@@ -200,7 +146,9 @@ export default function Page() {
       <div style={container}>
         <div style={card}>
           <h1 style={title}>
-            MOTION CONTROL SAYAANA
+            MOTION CONTROL
+            <br />
+            SAYAANA
           </h1>
 
           <button
@@ -243,23 +191,60 @@ export default function Page() {
             </option>
           </select>
 
-          <input
-            placeholder='Image URL'
-            value={imageUrl}
-            onChange={(e) =>
-              setImageUrl(e.target.value)
-            }
-            style={inputStyle}
-          />
+          <div style={uploadGrid}>
+            <div>
+              <h3>Reference Image</h3>
 
-          <input
-            placeholder='Video URL'
-            value={videoUrl}
-            onChange={(e) =>
-              setVideoUrl(e.target.value)
-            }
-            style={inputStyle}
-          />
+              <input
+                type='file'
+                accept='image/*'
+                onChange={(e) => {
+                  const file =
+                    e.target.files[0]
+
+                  setImageFile(file)
+
+                  setImagePreview(
+                    URL.createObjectURL(file)
+                  )
+                }}
+              />
+
+              {imagePreview && (
+                <img
+                  src={imagePreview}
+                  style={previewStyle}
+                />
+              )}
+            </div>
+
+            <div>
+              <h3>Reference Motion</h3>
+
+              <input
+                type='file'
+                accept='video/*'
+                onChange={(e) => {
+                  const file =
+                    e.target.files[0]
+
+                  setVideoFile(file)
+
+                  setVideoPreview(
+                    URL.createObjectURL(file)
+                  )
+                }}
+              />
+
+              {videoPreview && (
+                <video
+                  src={videoPreview}
+                  controls
+                  style={previewStyle}
+                />
+              )}
+            </div>
+          </div>
 
           <textarea
             placeholder='Prompt Motion'
@@ -292,52 +277,29 @@ export default function Page() {
             style={buttonStyle}
           >
             {loading
-              ? status
+              ? 'Generating...'
               : 'Generate Video'}
           </button>
-        </div>
-
-        {resultVideo && (
-          <div style={card}>
-            <h2>Result Video</h2>
-
-            <video
-              src={resultVideo}
-              controls
-              style={{
-                width: '100%',
-                borderRadius: 20
-              }}
-            />
-          </div>
-        )}
-
-        <div style={card}>
-          <h1>History Generate</h1>
-
-          {history.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                marginTop: 20
-              }}
-            >
-              <video
-                src={item.video}
-                controls
-                style={{
-                  width: '100%',
-                  borderRadius: 20
-                }}
-              />
-
-              <p>{item.prompt}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>
   )
+}
+
+const uploadGrid = {
+  display: 'grid',
+  gridTemplateColumns:
+    'repeat(auto-fit,minmax(250px,1fr))',
+  gap: 20,
+  marginTop: 20
+}
+
+const previewStyle = {
+  width: '100%',
+  borderRadius: 20,
+  marginTop: 10,
+  maxHeight: 300,
+  objectFit: 'cover'
 }
 
 const loginWrap = {
@@ -366,7 +328,7 @@ const mainStyle = {
 }
 
 const container = {
-  maxWidth: 900,
+  maxWidth: 1000,
   margin: '0 auto'
 }
 
@@ -378,8 +340,9 @@ const card = {
 }
 
 const title = {
-  fontSize: 38,
-  marginBottom: 10
+  fontSize: 55,
+  lineHeight: 1,
+  marginBottom: 20
 }
 
 const inputStyle = {
@@ -394,7 +357,7 @@ const inputStyle = {
 
 const textareaStyle = {
   width: '100%',
-  height: 120,
+  height: 150,
   marginTop: 20,
   borderRadius: 15,
   border: '1px solid #334155',
@@ -411,8 +374,7 @@ const buttonStyle = {
   borderRadius: 15,
   background: '#2563eb',
   color: 'white',
-  fontWeight: 'bold',
-  cursor: 'pointer'
+  fontWeight: 'bold'
 }
 
 const logoutStyle = {
@@ -422,4 +384,4 @@ const logoutStyle = {
   background: '#dc2626',
   color: 'white',
   marginBottom: 20
-      }
+                        }
